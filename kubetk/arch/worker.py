@@ -6,7 +6,7 @@ from .pipeline import pipeline_run
 
 def run_simple_worker(uri: str, handler: Callable[[Any], Any]):
     with get_rpc_object(uri) as rpc:
-        for work in iterate_sched(rpc):
+        for work in iterate_sched(uri):
             try:
                 handler(work)
             except Exception as exc:
