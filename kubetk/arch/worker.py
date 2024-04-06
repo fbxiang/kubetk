@@ -6,7 +6,10 @@ from .pipeline import pipeline_run
 
 def run_simple_worker(uri: str, handler: Callable[[Any], Any]):
     with get_rpc_object(uri) as rpc:
-        for work in iterate_sched(uri):
+        while True:
+            work = rpc.get()
+            if work is None:
+                break
             try:
                 handler(work)
             except Exception as exc:
@@ -28,14 +31,14 @@ def get_rpc_object(uri: str):
     return ServerProxy(uri, allow_none=True)
 
 
-def run_pipelined_worker(uri: str, pipeline_specs: Sequence[Tuple[Callable[[Any], Any], int]]):
-
+def run_pipelined_worker(
+    uri: str, pipeline_specs: Sequence[Tuple[Callable[[Any], Any], int]]
+):
     def _input_iter():
         for work in iterate_sched(uri):
             yield (work, work, None)
 
     def _wrap(fn):
-
         def _fn(x):
             work, arg, error = x
             if error is not None:
@@ -55,4 +58,6 @@ def run_pipelined_worker(uri: str, pipeline_specs: Sequence[Tuple[Callable[[Any]
             else:
                 rpc.error(work, repr(error) + " in " + repr(arg))
 
-    pipeline_run(_input_iter(), [(_wrap(f), n) for f, n in pipeline_specs] + [(_report, 2)])
+    pipeline_run(
+        _input_iter(), [(_wrap(f), n) for f, n in pipeline_specs] + [(_report, 2)]
+    )
