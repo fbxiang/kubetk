@@ -118,6 +118,13 @@ class Storage(object):
     def kv_load(self, k):
         return self.data.get(k)
 
+    def kv_dump(self, filename):
+        import json
+
+        with self.write_lock:
+            with open(filename, "w") as f:
+                json.dump(self.data, f)
+
 
 def serve_scheduler(work_queue: WorkQueue, stats_period: float = 30.0, port: int = 9105):
     stats = Statistics(work_queue, stats_period)
@@ -135,4 +142,5 @@ def serve_scheduler(work_queue: WorkQueue, stats_period: float = 30.0, port: int
         server.register_function(storage.kv_cas)
         server.register_function(storage.kv_load)
         server.register_function(storage.kv_store)
+        server.register_function(storage.kv_dump)
         server.serve_forever(0.5)
