@@ -56,6 +56,8 @@ class WorkQueue(object):
         self.ongoing.remove(workload)
         if workload in self.error_counts:
             self.total_backoff_success += 1
+            with self.error_lock:
+                del self.error_counts[workload]
         self.total_success += 1
 
     def ongoing_to_queue(self):
@@ -106,6 +108,9 @@ class Statistics(object):
         with self.work_queue.error_lock:
             return list(self.work_queue.messages)
 
+    def list_ongoing(self):
+        return list(self.work_queue.ongoing)
+
 
 class Storage(object):
     def __init__(self) -> None:
@@ -150,6 +155,7 @@ def serve_scheduler(
         server.register_function(stats.stat)
         server.register_function(stats.list_errors)
         server.register_function(stats.list_messages)
+        server.register_function(stats.list_ongoing)
         server.register_function(storage.kv_cas)
         server.register_function(storage.kv_load)
         server.register_function(storage.kv_store)
