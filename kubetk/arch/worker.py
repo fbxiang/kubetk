@@ -1,3 +1,4 @@
+import time
 from typing import *
 from xmlrpc.client import ServerProxy
 
@@ -21,14 +22,47 @@ def run_simple_worker(uri: str, handler: Callable[[Any], Any]):
 def iterate_sched(uri: str):
     with get_rpc_object(uri) as rpc:
         while True:
-            work = rpc.get()
+            for _ in range(5):
+                try:
+                    work = rpc.get()
+                    break
+                except ConnectionResetError:
+                    time.sleep(0.5)
+
             if work is None:
                 break
             yield work
 
 
+class RetryWrapper:
+    def __init__(self, rpc: ServerProxy):
+        self.__rpc = rpc
+
+    def __getattr__(self, name):
+        func = getattr(self.__rpc, name)
+
+        def retry_func(*args, **kwargs):
+            for t in range(5):
+                try:
+                    return func(*args, **kwargs)
+                except ConnectionResetError:
+                    time.sleep(t)
+            raise ConnectionResetError("Connection reset for all 5 retries")
+
+        return retry_func
+
+    def __call__(self, *args, **kwargs):
+        return self.__rpc.__call__(*args, **kwargs)
+
+    def __enter__(self):
+        return self.__rpc.__enter__()
+
+    def __exit__(self, *args):
+        return self.__rpc.__exit__(*args)
+
+
 def get_rpc_object(uri: str):
-    return ServerProxy(uri, allow_none=True)
+    return RetryWrapper(ServerProxy(uri, allow_none=True))
 
 
 def run_pipelined_worker(
