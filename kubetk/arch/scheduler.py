@@ -10,7 +10,7 @@ class WorkQueue(object):
         self,
         init_workload: list = None,
         backoff: int = 1,
-        error_message_limit: int = 100
+        error_message_limit: int = 100,
     ) -> None:
         self.queue = Queue()
         self.ongoing = set()
@@ -58,9 +58,16 @@ class WorkQueue(object):
             self.total_backoff_success += 1
         self.total_success += 1
 
+    def ongoing_to_queue(self):
+        """
+        only call when no worker is running
+        """
+        for workload in self.ongoing:
+            self.queue.put_nowait(workload)
+        self.ongoing.clear()
+
 
 class Statistics(object):
-
     def __init__(self, work_queue: WorkQueue, period: float = 30.0) -> None:
         self.work_queue = work_queue
         self.period = period
@@ -86,7 +93,9 @@ class Statistics(object):
             backoff_success=self.work_queue.total_backoff_success,
             backoff_failure=self.work_queue.total_backoff_failure,
             throughput=max(0.0, self.speed / self.period),
-            eta=0.0 if self.speed <= 0 else self.work_queue.queue.qsize() / self.speed * self.period
+            eta=0.0
+            if self.speed <= 0
+            else self.work_queue.queue.qsize() / self.speed * self.period,
         )
 
     def list_errors(self):
@@ -99,7 +108,6 @@ class Statistics(object):
 
 
 class Storage(object):
-
     def __init__(self) -> None:
         self.data = dict()
         self.write_lock = threading.Lock()
@@ -126,7 +134,9 @@ class Storage(object):
                 json.dump(self.data, f)
 
 
-def serve_scheduler(work_queue: WorkQueue, stats_period: float = 30.0, port: int = 9105):
+def serve_scheduler(
+    work_queue: WorkQueue, stats_period: float = 30.0, port: int = 9105
+):
     stats = Statistics(work_queue, stats_period)
     storage = Storage()
     with rpc_server.threaded(port) as server:
@@ -136,6 +146,7 @@ def serve_scheduler(work_queue: WorkQueue, stats_period: float = 30.0, port: int
         server.register_function(work_queue.put)
         server.register_function(work_queue.done)
         server.register_function(work_queue.error)
+        server.register_function(work_queue.ongoing_to_queue)
         server.register_function(stats.stat)
         server.register_function(stats.list_errors)
         server.register_function(stats.list_messages)
