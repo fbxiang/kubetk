@@ -55,10 +55,11 @@ class RetryWrapper:
         return self.__rpc.__call__(*args, **kwargs)
 
     def __enter__(self):
-        return self.__rpc.__enter__()
+        self.__rpc.__enter__()
+        return self
 
     def __exit__(self, *args):
-        return self.__rpc.__exit__(*args)
+        self.__rpc.__exit__(*args)
 
 
 def get_rpc_object(uri: str):
