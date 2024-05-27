@@ -3,6 +3,7 @@ import threading
 from queue import Queue, Empty
 from collections import defaultdict, deque
 from kubetk.helpers import rpc_server
+import subprocess
 
 
 class WorkQueue(object):
@@ -139,11 +140,38 @@ class Storage(object):
                 json.dump(self.data, f)
 
 
+def list_ips():
+    ips = (
+        subprocess.run(
+            [
+                "bash",
+                "-c",
+                "ip -4 addr | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}' | grep -v ^127\\. | grep -v ^172\\.",
+            ],
+            capture_output=True,
+        )
+        .stdout.decode()
+        .split()
+    )
+    return [x.strip() for x in ips if x.strip()]
+
+
 def serve_scheduler(
-    work_queue: WorkQueue, stats_period: float = 30.0, port: int = 9105
+    work_queue: WorkQueue, stats_period: float = 30.0, ip="0.0.0.0", port: int = 9105
 ):
     stats = Statistics(work_queue, stats_period)
     storage = Storage()
+
+    from xmlrpc.server import DocXMLRPCRequestHandler
+
+    if ip == "0.0.0.0":
+        ips = [ip]
+    else:
+        ips = [x for x in list_ips() if ip in x]
+        assert len(ips) == 1
+
+    rpc_server.RPCThreading((ips[0], port), DocXMLRPCRequestHandler, allow_none=True)
+
     with rpc_server.threaded(port) as server:
         server.register_introspection_functions()
         server.register_multicall_functions()

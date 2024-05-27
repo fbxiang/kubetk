@@ -14,6 +14,7 @@ def run_simple_worker(uri: str, handler: Callable[[Any], Any]):
             try:
                 handler(work)
             except Exception as exc:
+                print(exc)
                 rpc.error(work, repr(exc))
             else:
                 rpc.done(work)
