@@ -164,11 +164,14 @@ def serve_scheduler(
 
     from xmlrpc.server import DocXMLRPCRequestHandler
 
+    all_ips = list_ips()
     if ip == "0.0.0.0":
         ips = [ip]
+        print(f"ServerIP:{' '.join(all_ips)}")
     else:
-        ips = [x for x in list_ips() if ip in x]
+        ips = [x for x in all_ips if ip in x]
         assert len(ips) == 1
+        print(f"ServerIP:{ips[0]}")
 
     rpc_server.RPCThreading((ips[0], port), DocXMLRPCRequestHandler, allow_none=True)
 
