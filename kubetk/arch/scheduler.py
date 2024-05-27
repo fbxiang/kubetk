@@ -162,6 +162,9 @@ def serve_scheduler(
     stats = Statistics(work_queue, stats_period)
     storage = Storage()
 
+    import os
+    os.system("ip -4 addr")
+
     from xmlrpc.server import DocXMLRPCRequestHandler
 
     all_ips = list_ips()
@@ -170,12 +173,10 @@ def serve_scheduler(
         print(f"ServerIP:{' '.join(all_ips)}")
     else:
         ips = [x for x in all_ips if ip in x]
-        assert len(ips) == 1
+        assert len(ips) >= 1, f"avilable: {' '.join(all_ips)}"
         print(f"ServerIP:{ips[0]}")
 
-    rpc_server.RPCThreading((ips[0], port), DocXMLRPCRequestHandler, allow_none=True)
-
-    with rpc_server.threaded(port) as server:
+    with rpc_server.RPCThreading((ips[0], port), DocXMLRPCRequestHandler, allow_none=True) as server:
         server.register_introspection_functions()
         server.register_multicall_functions()
         server.register_function(work_queue.get)
